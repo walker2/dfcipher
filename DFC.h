@@ -45,8 +45,17 @@ private:
 
     void writeFile(const std::vector<byte> &msg, const std::string &path);
 
+    double correlationCoeff(const std::vector<byte> &in, const std::vector<byte> &out, int onesIn, int onesOut);
+
+    double getMedian(const std::vector<byte> &in);
+
+    int analyzeBits(const std::vector<byte> &message);
+
+    int countOnes(uint8_t byte);
+
 private:
     u32 transKey[32]{};
+
 };
 
 

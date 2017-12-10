@@ -1,8 +1,11 @@
+#include <iostream>
 #include "DFC.h"
 
 #define swapEndian(x)  __cpu_to_be32(x)
 #define right4(x)   ((x) & 0x0000ffff)
 #define left4(x)    ((x) >> 16)
+#define bit(x, n)   ((1 << n) & x) != 0
+#define CORRELATION
 
 static const u32 ks[8] =
         {
@@ -156,6 +159,17 @@ void DFC::cipherFile(const std::string &path, bool isEncryption)
             result[16 * i + j] = blockOut[j];
         }
     }
+
+    /* DO CORRELATION */
+#ifdef CORRELATION
+    int onesIn = analyzeBits(message);
+    int onesOut = analyzeBits(result);
+    std::cout << "Src:\nOnes: " << onesIn << " Zeroes: " << (message.size() * 8) - onesIn << std::endl;
+    std::cout << "Out:\nOnes: " << onesOut << " Zeroes: " << (result.size() * 8) - onesOut << std::endl;
+
+    double correlation = correlationCoeff(message, result, onesIn, onesOut);
+    std::cout << "Correlation coefficient is: " << correlation << std::endl;
+#endif
 
     std::string addMsg = isEncryption ? "_encrypted" : "_decrypted";
     size_t lastdot = path.find_last_of('.');
@@ -435,4 +449,71 @@ void DFC::writeFile(const std::vector<byte> &msg, const std::string &path)
     }
 
     out.close();
+}
+
+double DFC::correlationCoeff(const std::vector<byte> &in, const std::vector<byte> &out, int onesIn, int onesOut)
+{
+    double result = 0;
+
+    double partOnesIn = onesIn / (in.size() * 8.);
+    double partOnesOut = onesOut / (out.size() * 8.);
+    double numerator = 0;
+    double denomerator = 0;
+    double squareX = 0;
+    double squareY = 0;
+
+    for (int i = 0; i < in.size(); i++) {
+        for (int j = 0; j < 8; j++) {
+            double x = bit(in[i], j);
+            double y = bit(out[i], j);
+            numerator += (x - partOnesIn) * (y - partOnesOut);
+            squareX += x * x;
+            squareY += y * y;
+        }
+    }
+
+    denomerator = sqrt(squareX * squareY);
+
+    result = numerator / denomerator;
+
+    return result;
+
+}
+
+double DFC::getMedian(const std::vector<byte> &in)
+{
+    double a = 0;
+    for (auto i : in)
+    {
+        int ch = 1;
+        while (ch < 256)
+        {
+            a += ch & i;
+            ch <<= 1;
+        }
+    }
+    return a / (in.size() * 8);
+}
+
+int DFC::analyzeBits(const std::vector<byte> &message)
+{
+    int counter = 0;
+
+    for (int i = 0; i < message.size(); i++) {
+        counter += countOnes(message[i]);
+    }
+
+    return counter;
+}
+
+int DFC::countOnes(uint8_t byte) {
+    int counter = 0;
+
+    for (int i = 0; i < 8; i++) {
+        if (((1 << i) & byte) != 0) {
+            counter++;
+        }
+    }
+
+    return counter;
 }
